@@ -2,6 +2,7 @@
 
 import { motion, useMotionValue, useSpring } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { startScratchSound, modulateScratchSound, stopScratchSound } from "../utils/audio";
 
 type Props = {
   width: number;
@@ -20,6 +21,12 @@ export function ScratchCanvas({ width, height, onRevealThreshold, disabled }: Pr
   const glowSpring = useSpring(glow, { stiffness: 120, damping: 18 });
 
   const lastSampleRef = useRef(0);
+  const lastPosRef = useRef({ x: 0, y: 0, time: 0 });
+
+  useEffect(() => {
+    if (disabled) stopScratchSound();
+  }, [disabled]);
+
 
   const paint = useCallback(
     (cx: number, cy: number) => {
@@ -89,6 +96,18 @@ export function ScratchCanvas({ width, height, onRevealThreshold, disabled }: Pr
     if (!rect) return;
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    
+    // Modulación dinámica del sonido según la velocidad
+    const now = performance.now();
+    const dt = now - lastPosRef.current.time;
+    if (dt > 0) {
+      const dx = x - lastPosRef.current.x;
+      const dy = y - lastPosRef.current.y;
+      const velocity = Math.sqrt(dx * dx + dy * dy) / dt;
+      modulateScratchSound(velocity);
+    }
+    lastPosRef.current = { x, y, time: now };
+
     paint(x, y);
     glow.set(1);
   };
@@ -104,6 +123,7 @@ export function ScratchCanvas({ width, height, onRevealThreshold, disabled }: Pr
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           drawing.current = true;
+          startScratchSound();
           pointer(e);
         }}
         onPointerMove={(e) => {
@@ -113,6 +133,7 @@ export function ScratchCanvas({ width, height, onRevealThreshold, disabled }: Pr
         onPointerUp={(e) => {
           drawing.current = false;
           glow.set(0);
+          stopScratchSound();
           try {
             e.currentTarget.releasePointerCapture(e.pointerId);
           } catch {
@@ -122,6 +143,7 @@ export function ScratchCanvas({ width, height, onRevealThreshold, disabled }: Pr
         onPointerLeave={() => {
           drawing.current = false;
           glow.set(0);
+          stopScratchSound();
         }}
       />
       <motion.div

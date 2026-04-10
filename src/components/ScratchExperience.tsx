@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PreRegistrationForm } from "./PreRegistrationForm";
 import { ScratchCanvas } from "./ScratchCanvas";
 import { WinParticles } from "./WinParticles";
+import { playWinSound, playLoseSound } from "../utils/audio";
 
 type Step = "loading" | "register" | "scratch" | "result";
 
@@ -23,12 +24,12 @@ type ScratchResult = {
 
 type SymbolKey = "MOTO" | "TV" | "CARRO" | "PS5" | "BONO";
 
-const SYMBOL_META: Record<SymbolKey, { icon: string; label: string; hint: string }> = {
-  MOTO: { icon: "🏍️", label: "Moto", hint: "Premio" },
-  TV: { icon: "📺", label: "TV", hint: "Premio" },
-  CARRO: { icon: "🚗", label: "Carro", hint: "Premio" },
-  PS5: { icon: "🎮", label: "PS5", hint: "Premio" },
-  BONO: { icon: "🎁", label: "Bono", hint: "Premio" },
+const SYMBOL_META: Record<SymbolKey, { icon: string; label: string; hint: string; imgUrl?: string }> = {
+  MOTO: { icon: "🏍️", label: "Moto", hint: "Premio", imgUrl: "/prizes/moto.png" },
+  TV: { icon: "📺", label: "TV", hint: "Premio", imgUrl: "/prizes/tv.png" },
+  CARRO: { icon: "🚗", label: "Carro", hint: "Premio", imgUrl: "/prizes/car.png" },
+  PS5: { icon: "🎮", label: "PS5", hint: "Premio", imgUrl: "/prizes/ps5.png" },
+  BONO: { icon: "🎁", label: "Bono", hint: "Premio", imgUrl: "/prizes/bono.png" },
 };
 
 const SCRATCH_PREVIEW_BOARD = [
@@ -122,6 +123,11 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
       });
       setVerifying(false);
       setStep("result");
+      if (data.isWinner) {
+        playWinSound();
+      } else {
+        playLoseSound();
+      }
     } catch {
       setError("Error de red al confirmar el resultado.");
       setVerifying(false);
@@ -142,13 +148,15 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
       <motion.header
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8 text-center"
+        className="mb-10 text-center"
       >
-        <p className="font-display text-xs font-semibold uppercase tracking-[0.35em] text-gold/90">
-          Supergiros
-        </p>
-        <h1 className="mt-2 font-display text-3xl font-bold tracking-tight text-white md:text-4xl">
-          Raspe Mundialista
+        <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 rounded-full bg-white/5 border border-white/10 backdrop-blur-md shadow-[0_0_15px_rgba(244,196,48,0.2)]">
+          <p className="font-display text-[10px] font-semibold uppercase tracking-[0.3em] text-gold-light">
+            Supergiros Experiencia Premium
+          </p>
+        </div>
+        <h1 className="mt-2 font-display text-4xl font-bold tracking-tight text-white drop-shadow-lg md:text-5xl">
+          Raspe <span className="text-gradient-gold drop-shadow-[0_0_15px_rgba(244,196,48,0.4)]">Mundialista</span>
         </h1>
         {state?.campaignName ? (
           <p className="mt-2 text-sm text-white/65">{state.campaignName}</p>
@@ -163,8 +171,9 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.35 }}
-            className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md grass-texture"
+            className="glass-panel p-6 shadow-neon-blue relative overflow-hidden"
           >
+            <div className="absolute inset-0 bg-stadium-noise mix-blend-overlay opacity-20 pointer-events-none"></div>
             <h2 className="mb-1 font-display text-xl font-semibold text-white">Antes de jugar</h2>
             <p className="mb-6 text-sm text-white/60">
               Completa tus datos para validar tu participación y poder contactarte si resultas ganador.
@@ -185,17 +194,21 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
             <p className="text-center text-sm text-white/65">
               Arrastra el dedo o el mouse sobre la tarjeta para descubrir tu resultado.
             </p>
-            <div className="relative">
+            <div className="relative mt-4">
+              {/* Anillo exterior neon animado */}
+              <div className="absolute -inset-2 bg-gradient-to-r from-gold via-neon-purple to-neon-blue rounded-[1.5rem] blur opacity-40 animate-pulse-glow" aria-hidden="true" />
+              
               <div
-                className="absolute inset-0 -z-10 flex items-center justify-center rounded-2xl bg-gradient-to-br from-pitch-light to-pitch ring-2 ring-gold/40"
+                className="absolute inset-0 -z-10 flex items-center justify-center rounded-2xl bg-gradient-to-br from-sg-blue-dark to-sg-blue ring-1 ring-gold/40 shadow-neon-gold"
                 style={{ width: 320, height: 200 }}
               >
-                <span className="text-6xl" aria-hidden>
+                <div className="absolute inset-0 bg-stadium-noise mix-blend-overlay opacity-30"></div>
+                <span className="text-6xl drop-shadow-2xl" aria-hidden>
                   ⚽
                 </span>
               </div>
-              <div className="relative overflow-hidden rounded-2xl" style={{ width: 320, height: 200 }}>
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/90 to-pitch px-3 py-3">
+              <div className="relative overflow-hidden rounded-2xl ring-2 ring-white/10" style={{ width: 320, height: 200 }}>
+                <div className="absolute inset-0 bg-gradient-to-br from-sg-blue to-sg-blue-dark px-3 py-3">
                   <div className="space-y-1.5">
                     {SCRATCH_PREVIEW_BOARD.map((row, rowIdx) => (
                       <div key={`preview-row-${rowIdx}`} className="grid grid-cols-3 gap-1.5 rounded-lg bg-white/5 p-1.5">
@@ -206,8 +219,12 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
                               key={`preview-cell-${rowIdx}-${cellIdx}`}
                               className="flex min-h-12 items-center gap-1.5 rounded-md bg-black/35 px-1.5 py-1 text-white"
                             >
-                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/20 text-sm ring-1 ring-gold/40">
-                                <span aria-hidden>{symbol.icon}</span>
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/10 text-sm ring-1 ring-gold/40 overflow-hidden shadow-inner">
+                                {symbol.imgUrl ? (
+                                  <img src={symbol.imgUrl} alt={symbol.label} className="w-full h-full object-cover mix-blend-screen scale-125" />
+                                ) : (
+                                  <span aria-hidden>{symbol.icon}</span>
+                                )}
                               </div>
                               <div className="min-w-0 text-left">
                                 <p className="truncate text-[10px] font-semibold tracking-wide">{symbol.label}</p>
@@ -227,7 +244,7 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
                   disabled={scratchDone}
                 />
                 {verifying ? (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-pitch/85 backdrop-blur-sm">
+                  <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-sg-blue-dark/85 backdrop-blur-sm">
                     <motion.p
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -248,8 +265,12 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
             key="result"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            className="overflow-hidden rounded-3xl border border-white/15 bg-white/10 p-8 text-center shadow-2xl backdrop-blur-md"
+            className="glass-panel p-8 text-center relative overflow-hidden"
           >
+            {/* Efectos de fondo del resultado */}
+            <div className="absolute inset-0 bg-gradient-to-t from-gold/10 to-transparent pointer-events-none"></div>
+            <div className="absolute inset-0 bg-stadium-noise mix-blend-overlay opacity-20 pointer-events-none"></div>
+
             {isWinner ? <WinParticles /> : null}
             <motion.div
               initial={{ scale: 0.85 }}
@@ -257,7 +278,7 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
               transition={{ type: "spring", stiffness: 260, damping: 22 }}
               className="relative z-[1]"
             >
-              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gold/20 text-5xl">
+              <div className={`mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full text-5xl shadow-[0_0_30px_rgba(244,196,48,0.5)] ${isWinner ? 'bg-gradient-to-br from-gold-light to-gold-dark' : 'bg-white/10 border border-white/20'}`}>
                 {isWinner ? "🏆" : "🎯"}
               </div>
               <h2 className="font-display text-2xl font-bold text-white">
@@ -289,8 +310,12 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
                             key={`cell-${rowIdx}-${cellIdx}`}
                             className="flex min-h-14 items-center gap-2 rounded-md bg-black/35 px-2 py-2 text-white"
                           >
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold/20 text-base ring-1 ring-gold/40">
-                              <span aria-hidden>{symbol.icon}</span>
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold/10 text-base ring-1 ring-gold/40 overflow-hidden shadow-[0_0_10px_rgba(244,196,48,0.3)]">
+                                {symbol.imgUrl ? (
+                                  <img src={symbol.imgUrl} alt={symbol.label} className="w-full h-full object-cover mix-blend-screen scale-125" />
+                                ) : (
+                                  <span aria-hidden>{symbol.icon}</span>
+                                )}
                             </div>
                             <div className="min-w-0 text-left">
                               <p className="truncate text-[11px] font-semibold tracking-wide">{symbol.label}</p>

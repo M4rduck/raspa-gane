@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 :root {
-  --pitch-deep: #0a2f24;
-  --gold-glow: rgba(244, 196, 48, 0.35);
+  --sg-blue-dark: #001a3b;
+  --gold-glow: #f4c430;
+  --neon-blue: #00b2e3;
 }
 
 html {
@@ -12,13 +13,22 @@ html {
 }
 
 body {
-  @apply min-h-screen bg-pitch text-white antialiased;
-  background-image:
-    radial-gradient(ellipse 120% 80% at 50% -20%, var(--gold-glow), transparent),
-    linear-gradient(180deg, var(--pitch-deep) 0%, #0d3b2c 40%, #0a2820 100%);
+  @apply min-h-screen text-white antialiased overflow-x-hidden;
+  background-color: var(--sg-blue-dark);
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(0, 178, 227, 0.08), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(0, 43, 96, 0.5), transparent 25%);
 }
 
-/* Textura sutil tipo césped */
+.glass-panel {
+  @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-glass;
+}
+
+.text-gradient-gold {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-gold-light via-gold to-gold-dark;
+}
+
+/* Textura sutil tipo césped/casino */
 .grass-texture {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M0 38h2v2H0zm4 0h2v2H4zm8 0h2v2h-2zm8 0h2v2h-2zm8 0h2v2h-2z'/%3E%3C/g%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M0 38h2v2H0zm4 0h2v2H4zm8 0h2v2h-2zm8 0h2v2h-2zm8 0h2v2h-2z'/%3E%3C/g%3E%3C/svg%3E");
 }
