@@ -158,8 +158,12 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
         <h1 className="mt-2 font-display text-4xl font-bold tracking-tight text-white drop-shadow-lg md:text-5xl">
           Raspe <span className="text-gradient-gold drop-shadow-[0_0_15px_rgba(244,196,48,0.4)]">Mundialista</span>
         </h1>
-        {state?.campaignName ? (
-          <p className="mt-2 text-sm text-white/65">{state.campaignName}</p>
+        {state?.campaignName && !state.campaignName.toLowerCase().includes("raspe mundialista") ? (
+          <div className="mt-4 flex justify-center">
+            <span className="inline-block rounded-lg bg-sg-blue-light/50 px-3 py-1 text-xs font-medium text-sg-cyan border border-sg-cyan/30">
+              Campaña: {state.campaignName}
+            </span>
+          </div>
         ) : null}
       </motion.header>
 
@@ -185,50 +189,60 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
         {step === "scratch" && state ? (
           <motion.div
             key="scratch"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.4 }}
-            className="flex flex-col items-center gap-6"
+            initial={{ opacity: 0, scale: 0.96, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: -20 }}
+            transition={{ duration: 0.5, type: "spring", bounce: 0.4 }}
+            className="flex flex-col items-center gap-8 w-full"
           >
-            <p className="text-center text-sm text-white/65">
-              Arrastra el dedo o el mouse sobre la tarjeta para descubrir tu resultado.
-            </p>
-            <div className="relative mt-4">
-              {/* Anillo exterior neon animado */}
-              <div className="absolute -inset-2 bg-gradient-to-r from-gold via-neon-purple to-neon-blue rounded-[1.5rem] blur opacity-40 animate-pulse-glow" aria-hidden="true" />
+            {/* Contenedor tipo "Máquina Arcade / Pedestal" */}
+            <div className="w-full max-w-sm rounded-[2.5rem] p-6 glass-panel border-t border-t-white/20 shadow-[0_20px_50px_rgba(0,43,96,0.5)] relative overflow-hidden flex flex-col items-center">
+              <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
+
+              {/* Título de la máquina */}
+              <div className="mb-6 flex flex-col items-center">
+                 <div className="h-1 w-12 rounded-full bg-sg-cyan/50 mb-4"></div>
+                 <p className="text-center text-sm font-medium text-white/80 max-w-[200px]">
+                   Apunta tu moneda y barre la zona plateada
+                 </p>
+              </div>
+
+              <div className="relative mt-2">
+                {/* Anillo exterior neon animado que respira para llamar a la acción */}
+                <div className="absolute -inset-3 bg-gradient-to-r from-sg-cyan via-gold to-neon-blue rounded-[2rem] blur-xl opacity-50 animate-pulse-glow" aria-hidden="true" />
+
               
               <div
-                className="absolute inset-0 -z-10 flex items-center justify-center rounded-2xl bg-gradient-to-br from-sg-blue-dark to-sg-blue ring-1 ring-gold/40 shadow-neon-gold"
-                style={{ width: 320, height: 200 }}
+                className="absolute inset-0 -z-10 flex flex-col items-center justify-center rounded-2xl bg-gradient-to-b from-[#2d6a4f] to-[#081c15] ring-1 ring-gold/40 shadow-neon-gold"
+                style={{ width: 320, height: 420 }}
               >
                 <div className="absolute inset-0 bg-stadium-noise mix-blend-overlay opacity-30"></div>
-                <span className="text-6xl drop-shadow-2xl" aria-hidden>
-                  ⚽
-                </span>
               </div>
-              <div className="relative overflow-hidden rounded-2xl ring-2 ring-white/10" style={{ width: 320, height: 200 }}>
-                <div className="absolute inset-0 bg-gradient-to-br from-sg-blue to-sg-blue-dark px-3 py-3">
-                  <div className="space-y-1.5">
+              <div className="relative overflow-hidden rounded-2xl ring-2 ring-white/10" style={{ width: 320, height: 420 }}>
+                <div className="absolute inset-0 bg-gradient-to-b from-[#1b4332] to-[#081c15] p-3 flex flex-col justify-center">
+                  
+                  {/* Marca de agua / Etiqueta central imitando la referencia */}
+                  <div className="absolute top-1/2 left-0 right-0 -translate-y-1/2 z-0 flex flex-col items-center justify-center pointer-events-none mix-blend-plus-lighter">
+                    <p className="font-display font-black text-2xl text-white/90 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" style={{ WebkitTextStroke: '1px black' }}>TU OPORTUNIDAD</p>
+                    <p className="font-display font-black text-5xl text-gold drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]" style={{ WebkitTextStroke: '2px black' }}>MOTO</p>
+                  </div>
+
+                  <div className="space-y-2 relative z-10">
                     {SCRATCH_PREVIEW_BOARD.map((row, rowIdx) => (
-                      <div key={`preview-row-${rowIdx}`} className="grid grid-cols-3 gap-1.5 rounded-lg bg-white/5 p-1.5">
+                      <div key={`preview-row-${rowIdx}`} className="grid grid-cols-3 gap-2">
                         {row.map((cell, cellIdx) => {
                           const symbol = getSymbolMeta(cell);
                           return (
                             <div
                               key={`preview-cell-${rowIdx}-${cellIdx}`}
-                              className="flex min-h-12 items-center gap-1.5 rounded-md bg-black/35 px-1.5 py-1 text-white"
+                              className="flex aspect-square items-center justify-center rounded-full bg-black/40 ring-4 ring-white/10 shadow-inner backdrop-blur-sm"
                             >
-                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/10 text-sm ring-1 ring-gold/40 overflow-hidden shadow-inner">
+                              <div className="flex w-3/4 h-3/4 items-center justify-center">
                                 {symbol.imgUrl ? (
-                                  <img src={symbol.imgUrl} alt={symbol.label} className="w-full h-full object-cover mix-blend-screen scale-125" />
+                                  <img src={symbol.imgUrl} alt={symbol.label} className="w-full h-full object-contain filter drop-shadow-lg scale-125" />
                                 ) : (
-                                  <span aria-hidden>{symbol.icon}</span>
+                                  <span className="text-4xl" aria-hidden>{symbol.icon}</span>
                                 )}
-                              </div>
-                              <div className="min-w-0 text-left">
-                                <p className="truncate text-[10px] font-semibold tracking-wide">{symbol.label}</p>
-                                <p className="text-[9px] text-white/60">{symbol.hint}</p>
                               </div>
                             </div>
                           );
@@ -239,7 +253,7 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
                 </div>
                 <ScratchCanvas
                   width={320}
-                  height={200}
+                  height={420}
                   onRevealThreshold={onRevealThreshold}
                   disabled={scratchDone}
                 />
@@ -256,7 +270,8 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
                 ) : null}
               </div>
             </div>
-            {error ? <p className="text-center text-sm text-red-200">{error}</p> : null}
+            </div>
+            {error ? <div className="mt-4 px-4 py-2 bg-red-500/20 text-red-200 border border-red-500/50 rounded-xl text-center text-sm">{error}</div> : null}
           </motion.div>
         ) : null}
 
