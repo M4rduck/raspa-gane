@@ -1,0 +1,322 @@
+"use client";
+
+import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { PreRegistrationForm } from "./PreRegistrationForm";
+import { ScratchCanvas } from "./ScratchCanvas";
+import { WinParticles } from "./WinParticles";
+
+type Step = "loading" | "register" | "scratch" | "result";
+
+type TokenState = {
+  campaignName: string;
+  registered: boolean;
+  scratched: boolean;
+};
+
+type ScratchResult = {
+  isWinner: boolean;
+  board: string[][] | null;
+  winningLine: number | null;
+  prizeLabel: string | null;
+};
+
+type SymbolKey = "MOTO" | "TV" | "CARRO" | "PS5" | "BONO";
+
+const SYMBOL_META: Record<SymbolKey, { icon: string; label: string; hint: string }> = {
+  MOTO: { icon: "🏍️", label: "Moto", hint: "Premio" },
+  TV: { icon: "📺", label: "TV", hint: "Premio" },
+  CARRO: { icon: "🚗", label: "Carro", hint: "Premio" },
+  PS5: { icon: "🎮", label: "PS5", hint: "Premio" },
+  BONO: { icon: "🎁", label: "Bono", hint: "Premio" },
+};
+
+const SCRATCH_PREVIEW_BOARD = [
+  ["MOTO", "MOTO", "BONO"],
+  ["MOTO", "TV", "CARRO"],
+  ["BONO", "MOTO", "PS5"],
+];
+
+function getSymbolMeta(cell: string) {
+  return SYMBOL_META[cell as SymbolKey] ?? { icon: "🎟️", label: cell, hint: "Premio" };
+}
+
+export function ScratchExperience({ publicToken }: { publicToken: string }) {
+  const [step, setStep] = useState<Step>("loading");
+  const [state, setState] = useState<TokenState | null>(null);
+  const [isWinner, setIsWinner] = useState<boolean | null>(null);
+  const [result, setResult] = useState<ScratchResult | null>(null);
+  const [scratchDone, setScratchDone] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const revealOnceRef = useRef(false);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      const res = await fetch(`/api/tokens/${publicToken}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof data.error === "string" ? data.error : "Enlace inválido");
+        setStep("loading");
+        return;
+      }
+      setState({
+        campaignName: data.campaignName,
+        registered: data.registered,
+        scratched: data.scratched,
+      });
+      if (data.scratched) {
+        const sr = await fetch(`/api/tokens/${publicToken}/scratch`, { method: "POST" });
+        const sd = await sr.json().catch(() => ({}));
+        if (typeof sd.isWinner === "boolean") {
+          setIsWinner(sd.isWinner);
+          setResult({
+            isWinner: sd.isWinner,
+            board: Array.isArray(sd.board) ? sd.board : null,
+            winningLine: typeof sd.winningLine === "number" ? sd.winningLine : null,
+            prizeLabel: typeof sd.prizeLabel === "string" ? sd.prizeLabel : null,
+          });
+          setStep("result");
+        } else {
+          setError("No se pudo recuperar tu resultado.");
+        }
+        return;
+      }
+      if (data.registered) setStep("scratch");
+      else setStep("register");
+    } catch {
+      setError("No se pudo cargar. Revisa tu conexión.");
+    }
+  }, [publicToken]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRegistered = () => {
+    setState((s) => (s ? { ...s, registered: true } : s));
+    setStep("scratch");
+  };
+
+  const onRevealThreshold = useCallback(async () => {
+    if (revealOnceRef.current || scratchDone) return;
+    revealOnceRef.current = true;
+    setScratchDone(true);
+    setVerifying(true);
+    try {
+      const res = await fetch(`/api/tokens/${publicToken}/scratch`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof data.error === "string" ? data.error : "Error al confirmar");
+        setVerifying(false);
+        setScratchDone(false);
+        return;
+      }
+      setIsWinner(Boolean(data.isWinner));
+      setResult({
+        isWinner: Boolean(data.isWinner),
+        board: Array.isArray(data.board) ? data.board : null,
+        winningLine: typeof data.winningLine === "number" ? data.winningLine : null,
+        prizeLabel: typeof data.prizeLabel === "string" ? data.prizeLabel : null,
+      });
+      setVerifying(false);
+      setStep("result");
+    } catch {
+      setError("Error de red al confirmar el resultado.");
+      setVerifying(false);
+      setScratchDone(false);
+    }
+  }, [publicToken, scratchDone]);
+
+  if (error && step === "loading" && !state) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
+        <p className="text-lg text-red-200">{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative mx-auto max-w-lg px-4 pb-16 pt-6">
+      <motion.header
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-8 text-center"
+      >
+        <p className="font-display text-xs font-semibold uppercase tracking-[0.35em] text-gold/90">
+          Supergiros
+        </p>
+        <h1 className="mt-2 font-display text-3xl font-bold tracking-tight text-white md:text-4xl">
+          Raspe Mundialista
+        </h1>
+        {state?.campaignName ? (
+          <p className="mt-2 text-sm text-white/65">{state.campaignName}</p>
+        ) : null}
+      </motion.header>
+
+      <AnimatePresence mode="wait">
+        {step === "register" ? (
+          <motion.div
+            key="reg"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.35 }}
+            className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md grass-texture"
+          >
+            <h2 className="mb-1 font-display text-xl font-semibold text-white">Antes de jugar</h2>
+            <p className="mb-6 text-sm text-white/60">
+              Completa tus datos para validar tu participación y poder contactarte si resultas ganador.
+            </p>
+            <PreRegistrationForm publicToken={publicToken} onSuccess={onRegistered} />
+          </motion.div>
+        ) : null}
+
+        {step === "scratch" && state ? (
+          <motion.div
+            key="scratch"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.4 }}
+            className="flex flex-col items-center gap-6"
+          >
+            <p className="text-center text-sm text-white/65">
+              Arrastra el dedo o el mouse sobre la tarjeta para descubrir tu resultado.
+            </p>
+            <div className="relative">
+              <div
+                className="absolute inset-0 -z-10 flex items-center justify-center rounded-2xl bg-gradient-to-br from-pitch-light to-pitch ring-2 ring-gold/40"
+                style={{ width: 320, height: 200 }}
+              >
+                <span className="text-6xl" aria-hidden>
+                  ⚽
+                </span>
+              </div>
+              <div className="relative overflow-hidden rounded-2xl" style={{ width: 320, height: 200 }}>
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/90 to-pitch px-3 py-3">
+                  <div className="space-y-1.5">
+                    {SCRATCH_PREVIEW_BOARD.map((row, rowIdx) => (
+                      <div key={`preview-row-${rowIdx}`} className="grid grid-cols-3 gap-1.5 rounded-lg bg-white/5 p-1.5">
+                        {row.map((cell, cellIdx) => {
+                          const symbol = getSymbolMeta(cell);
+                          return (
+                            <div
+                              key={`preview-cell-${rowIdx}-${cellIdx}`}
+                              className="flex min-h-12 items-center gap-1.5 rounded-md bg-black/35 px-1.5 py-1 text-white"
+                            >
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/20 text-sm ring-1 ring-gold/40">
+                                <span aria-hidden>{symbol.icon}</span>
+                              </div>
+                              <div className="min-w-0 text-left">
+                                <p className="truncate text-[10px] font-semibold tracking-wide">{symbol.label}</p>
+                                <p className="text-[9px] text-white/60">{symbol.hint}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <ScratchCanvas
+                  width={320}
+                  height={200}
+                  onRevealThreshold={onRevealThreshold}
+                  disabled={scratchDone}
+                />
+                {verifying ? (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-pitch/85 backdrop-blur-sm">
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="font-display text-sm tracking-wide text-gold"
+                    >
+                      Validando resultado…
+                    </motion.p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            {error ? <p className="text-center text-sm text-red-200">{error}</p> : null}
+          </motion.div>
+        ) : null}
+
+        {step === "result" && isWinner !== null ? (
+          <motion.div
+            key="result"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="overflow-hidden rounded-3xl border border-white/15 bg-white/10 p-8 text-center shadow-2xl backdrop-blur-md"
+          >
+            {isWinner ? <WinParticles /> : null}
+            <motion.div
+              initial={{ scale: 0.85 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              className="relative z-[1]"
+            >
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gold/20 text-5xl">
+                {isWinner ? "🏆" : "🎯"}
+              </div>
+              <h2 className="font-display text-2xl font-bold text-white">
+                {isWinner ? "¡Ganaste!" : "Sigue intentando"}
+              </h2>
+              <p className="mt-3 text-sm text-white/70">
+                {isWinner
+                  ? "Pronto nos pondremos en contacto contigo con los pasos para reclamar tu premio."
+                  : "Gracias por participar. ¡La próxima puede ser la tuya!"}
+              </p>
+              {result?.prizeLabel ? (
+                <p className="mt-3 rounded-lg bg-gold/20 px-3 py-2 font-display text-base text-gold">
+                  Premio: {result.prizeLabel}
+                </p>
+              ) : null}
+              {result?.board ? (
+                <div className="mx-auto mt-5 w-full max-w-xs space-y-2">
+                  {result.board.map((row, rowIdx) => (
+                    <div
+                      key={`row-${rowIdx}`}
+                      className={`grid grid-cols-3 gap-2 rounded-lg p-2 ${
+                        result.winningLine === rowIdx ? "bg-gold/20 ring-1 ring-gold/70" : "bg-white/5"
+                      }`}
+                    >
+                      {row.map((cell, cellIdx) => {
+                        const symbol = getSymbolMeta(cell);
+                        return (
+                          <div
+                            key={`cell-${rowIdx}-${cellIdx}`}
+                            className="flex min-h-14 items-center gap-2 rounded-md bg-black/35 px-2 py-2 text-white"
+                          >
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold/20 text-base ring-1 ring-gold/40">
+                              <span aria-hidden>{symbol.icon}</span>
+                            </div>
+                            <div className="min-w-0 text-left">
+                              <p className="truncate text-[11px] font-semibold tracking-wide">{symbol.label}</p>
+                              <p className="text-[10px] text-white/60">{symbol.hint}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      {step === "loading" && !error ? (
+        <div className="flex justify-center py-20">
+          <motion.div
+            className="h-12 w-12 rounded-full border-2 border-gold/30 border-t-gold"
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}

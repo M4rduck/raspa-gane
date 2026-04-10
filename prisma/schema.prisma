@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  name        String
+  slug        String         @unique
+  /// Premio cada N enlaces emitidos (presorteo secuencial)
+  winEvery    Int
+  issuedCount Int            @default(0)
+  apiKeyHash  String
+  active      Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  tokens      ScratchToken[]
+}
+
+model ScratchToken {
+  id            String             @id @default(cuid())
+  /// Slug público en la URL (/r/[token])
+  publicToken   String             @unique
+  campaignId    String
+  campaign      Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  /// Resultado fijado al emitir el enlace (presorteo)
+  isWinner      Boolean
+  sequence      Int
+  /// Referencia opcional del sistema cliente (ej. id de usuario externo)
+  externalRef   String?
+  /// Tablero 3x3 serializado en JSON
+  boardJson     String?
+  /// Índice de línea ganadora (0..2) si aplica
+  winningLine   Int?
+  /// Premio asignado al tablero ganador
+  prizeLabel    String?
+  scratchedAt   DateTime?
+  registration  PreRegistration?
+  createdAt     DateTime           @default(now())
+}
+
+model PreRegistration {
+  id         String       @id @default(cuid())
+  tokenId    String       @unique
+  token      ScratchToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  fullName   String
+  email      String
+  phone      String
+  documentId String?
+  createdAt  DateTime     @default(now())
+}
