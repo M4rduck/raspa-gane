@@ -28,7 +28,7 @@ export default function HomePage() {
           <p className="mt-2 text-sm text-white/65">
             Copia <code className="rounded bg-black/30 px-1.5 py-0.5 text-gold/90">.env.example</code> a{" "}
             <code className="rounded bg-black/30 px-1.5 py-0.5">.env</code>. Define{" "}
-            <code className="rounded bg-black/30 px-1.5 py-0.5">DATABASE_URL</code>,{" "}
+            <code className="rounded bg-black/30 px-1.5 py-0.5">DATABASE_URL</code> (PostgreSQL),{" "}
             <code className="rounded bg-black/30 px-1.5 py-0.5">NEXT_PUBLIC_APP_URL</code> (URL pública de esta
             app) y <code className="rounded bg-black/30 px-1.5 py-0.5">MASTER_ADMIN_KEY</code> para crear
             campañas.
@@ -39,12 +39,15 @@ export default function HomePage() {
           <h2 className="font-display text-xl font-semibold text-gold">2. Base de datos y demo</h2>
           <pre className="mt-3 overflow-x-auto rounded-xl bg-black/40 p-4 text-sm text-white/85">
             {`npm install
-npx prisma db push
+npm run db:push
 npm run db:seed`}
           </pre>
           <p className="mt-2 text-sm text-white/60">
-            El seed crea la campaña <strong className="text-white/80">mundialista-demo</strong> y muestra en
-            consola una <code className="text-gold/90">apiKey</code> de prueba.
+            <code className="text-gold/90">db:push</code> crea o actualiza tablas según{" "}
+            <code className="text-white/70">schema.prisma</code> (sin carpeta de migraciones). El seed crea la
+            campaña <strong className="text-white/80">mundialista-demo</strong> y muestra en consola una{" "}
+            <code className="text-gold/90">apiKey</code> de prueba. Atajo:{" "}
+            <code className="rounded bg-black/30 px-1">npm run db:setup</code>.
           </p>
         </div>
 
@@ -52,18 +55,45 @@ npm run db:seed`}
           <h2 className="font-display text-xl font-semibold text-gold">3. Crear campaña (admin)</h2>
           <p className="mt-2 text-sm text-white/65">
             <code className="text-gold/90">winEvery</code>: premio cada N enlaces generados (presorteo
-            secuencial). La API de enlaces no devuelve si es ganador para evitar filtraciones antes del raspe.
+            secuencial). Opcional <code className="text-gold/90">prizes</code>: al crear el enlace ganador se
+            elige premio por <strong className="text-white/75">pesos relativos</strong> (ej.{" "}
+            <code className="text-gold/90">weight: 1, 10, 50</code>) y{" "}
+            <code className="text-gold/90">stockRemaining</code> (o <code className="text-gold/90">null</code>{" "}
+            ilimitado), e <code className="text-gold/90">imageUrl</code> opcional (ruta <code className="text-white/70">/…</code>{" "}
+            o URL <code className="text-white/70">https://…</code>) por premio. Símbolos del tablero: PS5, CARRO, MOTO,
+            TV, BONO.
           </p>
           <pre className="mt-3 overflow-x-auto rounded-xl bg-black/40 p-4 text-sm text-white/85">
             {`curl -X POST http://localhost:3000/api/v1/campaigns \\
   -H "Content-Type: application/json" \\
   -H "X-Master-Key: TU_MASTER_ADMIN_KEY" \\
-  -d '{"name":"Promo Copa","slug":"copa-2026","winEvery":1000}'`}
+  -d '{"name":"Promo Copa","slug":"copa-2026","winEvery":1000,
+  "prizes":[
+    {"symbol":"CARRO","label":"Carro 0 KM","weight":1,"stockRemaining":1,"imageUrl":"/prizes/car.png"},
+    {"symbol":"MOTO","label":"Moto","weight":10,"stockRemaining":null,"imageUrl":"https://ejemplo.com/moto.png"},
+    {"symbol":"BONO","label":"Bono $50.000","weight":50,"stockRemaining":null}
+  ]}'`}
           </pre>
         </div>
 
         <div>
-          <h2 className="font-display text-xl font-semibold text-gold">4. Generar enlace (integración cliente)</h2>
+          <h2 className="font-display text-xl font-semibold text-gold">4. Reportes para el cliente</h2>
+          <p className="mt-2 text-sm text-white/65">
+            Misma API key que en enlaces. Página rápida:{" "}
+            <a href="/cliente" className="text-gold/90 underline-offset-2 hover:underline">
+              /cliente
+            </a>
+            . O por API:{" "}
+            <code className="rounded bg-black/30 px-1.5 py-0.5 text-xs text-white/80">
+              GET /api/v1/reports/participation?format=csv
+            </code>{" "}
+            con <code className="text-gold/90">Authorization: Bearer sg_…</code> (también{" "}
+            <code className="text-white/70">format=json</code>).
+          </p>
+        </div>
+
+        <div>
+          <h2 className="font-display text-xl font-semibold text-gold">5. Generar enlace (integración cliente)</h2>
           <pre className="mt-3 overflow-x-auto rounded-xl bg-black/40 p-4 text-sm text-white/85">
             {`curl -X POST http://localhost:3000/api/v1/links \\
   -H "Content-Type: application/json" \\
@@ -79,7 +109,7 @@ npm run db:seed`}
         </div>
 
         <div>
-          <h2 className="font-display text-xl font-semibold text-gold">5. Consultar ganadores</h2>
+          <h2 className="font-display text-xl font-semibold text-gold">6. Consultar ganadores</h2>
           <p className="mt-2 text-sm text-white/65">
             Usa Prisma Studio o consultas SQL: tablas{" "}
             <code className="rounded bg-black/30 px-1.5">ScratchToken</code> (campo{" "}
@@ -93,8 +123,10 @@ npm run db:seed`}
       </section>
 
       <p className="mt-10 text-center text-sm text-white/45">
-        Producción: PostgreSQL, HTTPS, rotación de API keys, rate limiting y cumplimiento legal de juegos de
-        suerte y azar en tu jurisdicción.
+        Producción: RDS u otro PostgreSQL administrado, HTTPS, rotación de API keys, rate limiting y cumplimiento
+        legal de juegos de suerte y azar en tu jurisdicción. Si el equipo crece, valorar{" "}
+        <code className="text-white/60">prisma migrate</code> para versionar cambios de esquema en lugar de solo{" "}
+        <code className="text-white/60">db push</code>.
       </p>
     </main>
   );

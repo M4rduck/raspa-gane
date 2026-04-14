@@ -15,11 +15,14 @@ type TokenState = {
   scratched: boolean;
 };
 
+type PrizeAssetsMap = Record<string, { label: string; imageUrl: string | null }>;
+
 type ScratchResult = {
   isWinner: boolean;
   board: string[][] | null;
   winningLine: number | null;
   prizeLabel: string | null;
+  winnerImageUrl?: string | null;
 };
 
 type SymbolKey = "MOTO" | "TV" | "CARRO" | "PS5" | "BONO";
@@ -38,12 +41,38 @@ const SCRATCH_PREVIEW_BOARD = [
   ["BONO", "MOTO", "PS5"],
 ];
 
-function getSymbolMeta(cell: string) {
-  return SYMBOL_META[cell as SymbolKey] ?? { icon: "🎟️", label: cell, hint: "Premio" };
+function parsePrizeAssets(raw: unknown): PrizeAssetsMap | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const out: PrizeAssetsMap = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (!v || typeof v !== "object") continue;
+    const vo = v as { label?: unknown; imageUrl?: unknown };
+    const label = typeof vo.label === "string" ? vo.label : k;
+    const imageUrl =
+      vo.imageUrl === null || vo.imageUrl === undefined
+        ? null
+        : typeof vo.imageUrl === "string"
+          ? vo.imageUrl || null
+          : null;
+    out[k] = { label, imageUrl };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+function resolveSymbolDisplay(cell: string, prizeAssets: PrizeAssetsMap | null) {
+  const base = SYMBOL_META[cell as SymbolKey] ?? { icon: "🎟️", label: cell, hint: "Premio", imgUrl: undefined };
+  const o = prizeAssets?.[cell];
+  return {
+    icon: base.icon,
+    hint: base.hint,
+    label: o?.label ?? base.label,
+    imgUrl: o?.imageUrl ?? base.imgUrl,
+  };
 }
 
 export function ScratchExperience({ publicToken }: { publicToken: string }) {
   const [step, setStep] = useState<Step>("loading");
+  const [prizeAssets, setPrizeAssets] = useState<PrizeAssetsMap | null>(null);
   const [state, setState] = useState<TokenState | null>(null);
   const [isWinner, setIsWinner] = useState<boolean | null>(null);
   const [result, setResult] = useState<ScratchResult | null>(null);
@@ -62,6 +91,7 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
         setStep("loading");
         return;
       }
+      setPrizeAssets(parsePrizeAssets(data.prizeAssets));
       setState({
         campaignName: data.campaignName,
         registered: data.registered,
@@ -71,12 +101,16 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
         const sr = await fetch(`/api/tokens/${publicToken}/scratch`, { method: "POST" });
         const sd = await sr.json().catch(() => ({}));
         if (typeof sd.isWinner === "boolean") {
+          const pa = parsePrizeAssets(sd.prizeAssets);
+          if (pa) setPrizeAssets(pa);
           setIsWinner(sd.isWinner);
           setResult({
             isWinner: sd.isWinner,
             board: Array.isArray(sd.board) ? sd.board : null,
             winningLine: typeof sd.winningLine === "number" ? sd.winningLine : null,
             prizeLabel: typeof sd.prizeLabel === "string" ? sd.prizeLabel : null,
+            winnerImageUrl:
+              typeof sd.winnerImageUrl === "string" && sd.winnerImageUrl ? sd.winnerImageUrl : null,
           });
           setStep("result");
         } else {
@@ -114,12 +148,16 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
         setScratchDone(false);
         return;
       }
+      const pa = parsePrizeAssets(data.prizeAssets);
+      if (pa) setPrizeAssets(pa);
       setIsWinner(Boolean(data.isWinner));
       setResult({
         isWinner: Boolean(data.isWinner),
         board: Array.isArray(data.board) ? data.board : null,
         winningLine: typeof data.winningLine === "number" ? data.winningLine : null,
         prizeLabel: typeof data.prizeLabel === "string" ? data.prizeLabel : null,
+        winnerImageUrl:
+          typeof data.winnerImageUrl === "string" && data.winnerImageUrl ? data.winnerImageUrl : null,
       });
       setVerifying(false);
       setStep("result");
@@ -231,7 +269,7 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
                     {SCRATCH_PREVIEW_BOARD.map((row, rowIdx) => (
                       <div key={`preview-row-${rowIdx}`} className="grid grid-cols-3 gap-2">
                         {row.map((cell, cellIdx) => {
-                          const symbol = getSymbolMeta(cell);
+                          const symbol = resolveSymbolDisplay(cell, prizeAssets);
                           return (
                             <div
                               key={`preview-cell-${rowIdx}-${cellIdx}`}
@@ -293,9 +331,21 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
               transition={{ type: "spring", stiffness: 260, damping: 22 }}
               className="relative z-[1]"
             >
-              <div className={`mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full text-5xl shadow-[0_0_30px_rgba(244,196,48,0.5)] ${isWinner ? 'bg-gradient-to-br from-gold-light to-gold-dark' : 'bg-white/10 border border-white/20'}`}>
-                {isWinner ? "🏆" : "🎯"}
-              </div>
+              {isWinner && result?.winnerImageUrl ? (
+                <div className="mx-auto mb-4 flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl bg-black/30 ring-2 ring-gold/50 shadow-[0_0_30px_rgba(244,196,48,0.35)]">
+                  <img
+                    src={result.winnerImageUrl}
+                    alt={result.prizeLabel ?? "Premio"}
+                    className="h-full w-full object-contain p-2"
+                  />
+                </div>
+              ) : (
+                <div
+                  className={`mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full text-5xl shadow-[0_0_30px_rgba(244,196,48,0.5)] ${isWinner ? "bg-gradient-to-br from-gold-light to-gold-dark" : "bg-white/10 border border-white/20"}`}
+                >
+                  {isWinner ? "🏆" : "🎯"}
+                </div>
+              )}
               <h2 className="font-display text-2xl font-bold text-white">
                 {isWinner ? "¡Ganaste!" : "Sigue intentando"}
               </h2>
@@ -319,7 +369,7 @@ export function ScratchExperience({ publicToken }: { publicToken: string }) {
                       }`}
                     >
                       {row.map((cell, cellIdx) => {
-                        const symbol = getSymbolMeta(cell);
+                        const symbol = resolveSymbolDisplay(cell, prizeAssets);
                         return (
                           <div
                             key={`cell-${rowIdx}-${cellIdx}`}

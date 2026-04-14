@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { prisma } from "@/lib/prisma";
-import { findCampaignByApiKey } from "@/lib/campaign-auth";
+import { bearerApiKey, findCampaignByApiKey } from "@/lib/campaign-auth";
+import { assignPrizeForWinner } from "@/lib/prize-assignment";
 import { scratchLink } from "@/lib/app-url";
-
-function bearerApiKey(auth: string | null): string | null {
-  if (!auth?.startsWith("Bearer ")) return null;
-  return auth.slice(7).trim() || null;
-}
 
 export async function POST(request: Request) {
   try {
@@ -37,7 +33,26 @@ export async function POST(request: Request) {
         select: { issuedCount: true, winEvery: true },
       });
       const sequence = updated.issuedCount;
-      const isWinner = sequence % updated.winEvery === 0;
+      let isWinner = sequence % updated.winEvery === 0;
+
+      let prizeId: string | null = null;
+      let prizeLabel: string | null = null;
+      let assignedSymbol: string | null = null;
+
+      if (isWinner) {
+        const configuredPrizes = await tx.prize.count({ where: { campaignId: campaign.id } });
+        if (configuredPrizes > 0) {
+          const assigned = await assignPrizeForWinner(tx, campaign.id);
+          if (!assigned) {
+            isWinner = false;
+          } else {
+            prizeId = assigned.prizeId;
+            prizeLabel = assigned.label;
+            assignedSymbol = assigned.symbol;
+          }
+        }
+      }
+
       const token = await tx.scratchToken.create({
         data: {
           publicToken,
@@ -45,6 +60,9 @@ export async function POST(request: Request) {
           isWinner,
           sequence,
           externalRef,
+          prizeId,
+          prizeLabel,
+          assignedSymbol,
         },
       });
       return { token, sequence };
@@ -70,7 +88,7 @@ export async function POST(request: Request) {
         detail: process.env.NODE_ENV === "development" ? message : undefined,
         hint:
           process.env.NODE_ENV === "development"
-            ? "¿Existe .env con DATABASE_URL? Ejecuta: npx prisma db push && npm run db:seed"
+            ? "¿Existe .env con DATABASE_URL (PostgreSQL)? Ejecuta: npm run db:push && npm run db:seed"
             : undefined,
       },
       { status: 500 },

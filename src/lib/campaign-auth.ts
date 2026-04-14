@@ -1,6 +1,11 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 
+export function bearerApiKey(authHeader: string | null): string | null {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  return authHeader.slice(7).trim() || null;
+}
+
 export async function findCampaignByApiKey(apiKey: string) {
   if (!apiKey) return null;
   const campaigns = await prisma.campaign.findMany({

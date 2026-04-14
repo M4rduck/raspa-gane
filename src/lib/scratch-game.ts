@@ -1,6 +1,6 @@
-const SYMBOLS = ["PS5", "CARRO", "MOTO", "TV", "BONO"] as const;
+export const SCRATCH_SYMBOLS = ["PS5", "CARRO", "MOTO", "TV", "BONO"] as const;
 
-const PRIZE_BY_SYMBOL: Record<(typeof SYMBOLS)[number], string> = {
+const PRIZE_BY_SYMBOL: Record<(typeof SCRATCH_SYMBOLS)[number], string> = {
   PS5: "Consola PS5",
   CARRO: "Carro 0 KM",
   MOTO: "Moto deportiva",
@@ -8,7 +8,11 @@ const PRIZE_BY_SYMBOL: Record<(typeof SYMBOLS)[number], string> = {
   BONO: "Bono Supergiros",
 };
 
-type SymbolValue = (typeof SYMBOLS)[number];
+type SymbolValue = (typeof SCRATCH_SYMBOLS)[number];
+
+export function isScratchSymbol(value: string): value is SymbolValue {
+  return (SCRATCH_SYMBOLS as readonly string[]).includes(value);
+}
 
 export type ScratchBoard = {
   board: SymbolValue[][];
@@ -17,18 +21,22 @@ export type ScratchBoard = {
 };
 
 function randomSymbol(except?: SymbolValue): SymbolValue {
-  const pool = except ? SYMBOLS.filter((s) => s !== except) : SYMBOLS;
+  const pool = except ? SCRATCH_SYMBOLS.filter((s) => s !== except) : [...SCRATCH_SYMBOLS];
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-export function buildScratchBoard(isWinner: boolean): ScratchBoard {
+/**
+ * @param assignedSymbol — Si el enlace ya fijó premio al generarse, debe usarse ese símbolo en la línea ganadora.
+ */
+export function buildScratchBoard(isWinner: boolean, assignedSymbol: string | null = null): ScratchBoard {
   const board: SymbolValue[][] = Array.from({ length: 3 }, () =>
     Array.from({ length: 3 }, () => randomSymbol()),
   );
 
   if (isWinner) {
     const winningLine = Math.floor(Math.random() * 3);
-    const symbol = randomSymbol();
+    const symbol: SymbolValue =
+      assignedSymbol && isScratchSymbol(assignedSymbol) ? assignedSymbol : randomSymbol();
     board[winningLine] = [symbol, symbol, symbol];
     return {
       board,
@@ -59,7 +67,7 @@ export function parseStoredBoard(boardJson: string | null): SymbolValue[][] | nu
     for (const row of parsed) {
       if (!Array.isArray(row) || row.length !== 3) return null;
       for (const item of row) {
-        if (!SYMBOLS.includes(item as SymbolValue)) return null;
+        if (!SCRATCH_SYMBOLS.includes(item as SymbolValue)) return null;
       }
     }
     return parsed as SymbolValue[][];

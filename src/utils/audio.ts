@@ -5,7 +5,10 @@ let audioCtx: AudioContext | null = null;
 function getContext() {
   if (typeof window === "undefined") return null;
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const Win = window as Window & { webkitAudioContext?: typeof AudioContext };
+    const Ctor = Win.AudioContext ?? Win.webkitAudioContext;
+    if (!Ctor) return null;
+    audioCtx = new Ctor();
   }
   return audioCtx;
 }
@@ -18,7 +21,7 @@ export function playWinSound() {
   if (ctx.state === "suspended") ctx.resume();
 
   const notes = [440.00, 554.37, 659.25, 880.00]; // A4, C#5, E5, A5 (Acorde Mayor Feliz)
-  let startTime = ctx.currentTime;
+  const startTime = ctx.currentTime;
 
   notes.forEach((freq, i) => {
     const osc = ctx.createOscillator();
@@ -120,7 +123,11 @@ export function stopScratchSound() {
   scratchGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.1);
   const oscToStop = scratchOsc;
   setTimeout(() => {
-    try { oscToStop.stop(); } catch (e) {}
+    try {
+      oscToStop.stop();
+    } catch {
+      /* ya detenido */
+    }
   }, 100);
 
   scratchOsc = null;

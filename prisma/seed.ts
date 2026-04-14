@@ -20,14 +20,47 @@ async function main() {
     data: {
       name: "Raspe Mundialista — Demo",
       slug: "mundialista-demo",
-      winEvery: 5,
+      winEvery: 1,
       apiKeyHash,
+      prizes: {
+        create: [
+          {
+            symbol: "CARRO",
+            label: "Carro 0 KM",
+            weight: 1,
+            stockRemaining: 2,
+            sortOrder: 0,
+            imageUrl: "/prizes/car.png",
+          },
+          {
+            symbol: "MOTO",
+            label: "Moto deportiva",
+            weight: 10,
+            stockRemaining: null,
+            sortOrder: 1,
+            imageUrl: "/prizes/moto.png",
+          },
+          {
+            symbol: "BONO",
+            label: "Bono $50.000",
+            weight: 50,
+            stockRemaining: null,
+            sortOrder: 2,
+            imageUrl: "/prizes/bono.png",
+          },
+        ],
+      },
     },
+    include: { prizes: true },
   });
 
   console.log("\n--- Demo lista ---");
   console.log("slug:", campaign.slug);
   console.log("winEvery (premio cada N enlaces):", campaign.winEvery);
+  console.log(
+    "Premios (pesos 1:10:50 ≈ 1/61 carro, 10/61 moto, 50/61 bono; carro con stock 2):",
+    campaign.prizes.map((p) => `${p.symbol} w=${p.weight} stock=${p.stockRemaining ?? "∞"}`).join(", "),
+  );
   console.log("API key (guárdala; solo se muestra ahora):", apiKey);
   console.log("POST /api/v1/links con header: Authorization: Bearer <apiKey>");
 }
