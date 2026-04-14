@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { buildPrizeAssetsRecord } from "@/lib/prize-assets";
+import { isValidPublicToken } from "@/lib/security-input";
 
 type Params = { params: Promise<{ publicToken: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
   const { publicToken } = await params;
+  if (!isValidPublicToken(publicToken)) {
+    return NextResponse.json({ error: "Enlace no válido" }, { status: 404 });
+  }
   const token = await prisma.scratchToken.findUnique({
     where: { publicToken },
     include: {

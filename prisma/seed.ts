@@ -1,6 +1,11 @@
+import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
+
+function hashApiKeyForLookup(apiKey: string) {
+  return createHash("sha256").update(apiKey, "utf8").digest("hex");
+}
 
 const prisma = new PrismaClient();
 
@@ -15,6 +20,7 @@ async function main() {
 
   const apiKey = `sg_${nanoid(40)}`;
   const apiKeyHash = await bcrypt.hash(apiKey, 12);
+  const apiKeyLookup = hashApiKeyForLookup(apiKey);
 
   const campaign = await prisma.campaign.create({
     data: {
@@ -22,6 +28,7 @@ async function main() {
       slug: "mundialista-demo",
       winEvery: 1,
       apiKeyHash,
+      apiKeyLookup,
       prizes: {
         create: [
           {

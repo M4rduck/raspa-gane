@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
 import { prisma } from "@/lib/prisma";
+import { hashApiKeyForLookup } from "@/lib/api-key-lookup";
 import { assertMasterKey } from "@/lib/campaign-auth";
 import { normalizePrizeImageUrl } from "@/lib/prize-assets";
 import { isScratchSymbol } from "@/lib/scratch-game";
+import { LIMITS, readJsonBodyLimited } from "@/lib/security-input";
 
 export async function POST(request: Request) {
   const master = request.headers.get("x-master-key");
@@ -22,12 +24,16 @@ export async function POST(request: Request) {
     imageUrl?: string | null;
   };
 
-  let body: { name?: string; slug?: string; winEvery?: number; prizes?: PrizeBody[] };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  const parsed = await readJsonBodyLimited<{
+    name?: string;
+    slug?: string;
+    winEvery?: number;
+    prizes?: PrizeBody[];
+  }>(request, LIMITS.jsonBodyCampaigns);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.message }, { status: parsed.status });
   }
+  const body = parsed.data;
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const slug = typeof body.slug === "string" ? body.slug.trim().toLowerCase().replace(/\s+/g, "-") : "";
@@ -110,6 +116,7 @@ export async function POST(request: Request) {
 
   const apiKey = `sg_${nanoid(40)}`;
   const apiKeyHash = await bcrypt.hash(apiKey, 12);
+  const apiKeyLookup = hashApiKeyForLookup(apiKey);
 
   try {
     const campaign = await prisma.campaign.create({
@@ -118,6 +125,7 @@ export async function POST(request: Request) {
         slug,
         winEvery,
         apiKeyHash,
+        apiKeyLookup,
         ...(prizesCreate.length > 0
           ? {
               prizes: {

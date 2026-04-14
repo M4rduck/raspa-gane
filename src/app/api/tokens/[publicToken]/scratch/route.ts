@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { buildPrizeAssetsRecord } from "@/lib/prize-assets";
 import { buildScratchBoard, parseStoredBoard } from "@/lib/scratch-game";
+import { isValidPublicToken } from "@/lib/security-input";
 
 type Params = { params: Promise<{ publicToken: string }> };
 
@@ -17,6 +18,9 @@ function winnerSymbolFromBoard(
 
 export async function POST(_request: Request, { params }: Params) {
   const { publicToken } = await params;
+  if (!isValidPublicToken(publicToken)) {
+    return NextResponse.json({ error: "Enlace no válido" }, { status: 404 });
+  }
   const token = await prisma.scratchToken.findUnique({
     where: { publicToken },
     include: {
@@ -59,33 +63,60 @@ export async function POST(_request: Request, { params }: Params) {
 
   const outcome = buildScratchBoard(token.isWinner, token.assignedSymbol);
   const prizeLabel = token.prizeLabel ?? outcome.prizeLabel;
-  const updated = await prisma.scratchToken.update({
-    where: { id: token.id },
+
+  const applied = await prisma.scratchToken.updateMany({
+    where: { id: token.id, scratchedAt: null },
     data: {
       scratchedAt: new Date(),
       boardJson: JSON.stringify(outcome.board),
       winningLine: outcome.winningLine,
       prizeLabel,
     },
-    select: {
-      isWinner: true,
-      boardJson: true,
-      winningLine: true,
-      prizeLabel: true,
-      assignedSymbol: true,
-    },
   });
 
-  const board = parseStoredBoard(updated.boardJson);
-  const sym = winnerSymbolFromBoard(board, updated.winningLine, updated.assignedSymbol);
+  if (applied.count === 0) {
+    const again = await prisma.scratchToken.findUnique({
+      where: { publicToken },
+      include: {
+        campaign: {
+          include: {
+            prizes: {
+              select: { symbol: true, label: true, imageUrl: true },
+              orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+            },
+          },
+        },
+      },
+    });
+    if (!again?.campaign) {
+      return NextResponse.json({ error: "Enlace no válido" }, { status: 404 });
+    }
+    const pa = buildPrizeAssetsRecord(again.campaign.prizes);
+    const board = parseStoredBoard(again.boardJson);
+    const sym = winnerSymbolFromBoard(board, again.winningLine, again.assignedSymbol);
+    const winnerImageUrl =
+      again.isWinner && sym ? pa[sym]?.imageUrl ?? null : null;
+    return NextResponse.json({
+      already: true,
+      isWinner: again.isWinner,
+      board,
+      winningLine: again.winningLine,
+      prizeLabel: again.prizeLabel,
+      prizeAssets: pa,
+      winnerImageUrl,
+    });
+  }
+
+  const board = outcome.board;
+  const sym = winnerSymbolFromBoard(board, outcome.winningLine, token.assignedSymbol);
   const winnerImageUrl =
-    updated.isWinner && sym ? prizeAssets[sym]?.imageUrl ?? null : null;
+    token.isWinner && sym ? prizeAssets[sym]?.imageUrl ?? null : null;
 
   return NextResponse.json({
-    isWinner: updated.isWinner,
+    isWinner: token.isWinner,
     board,
-    winningLine: updated.winningLine,
-    prizeLabel: updated.prizeLabel,
+    winningLine: outcome.winningLine,
+    prizeLabel,
     prizeAssets,
     winnerImageUrl,
   });

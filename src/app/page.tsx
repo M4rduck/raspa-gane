@@ -74,6 +74,30 @@ npm run db:seed`}
     {"symbol":"BONO","label":"Bono $50.000","weight":50,"stockRemaining":null}
   ]}'`}
           </pre>
+          <p className="mt-4 text-sm text-white/65">
+            <strong className="text-white/80">Ajustes en caliente</strong> (sin parar la campaña):{" "}
+            <code className="text-gold/90">GET /api/v1/campaigns/{"{slug}"}</code> para ver{" "}
+            <code className="text-white/70">winEvery</code>, premios y stock;{" "}
+            <code className="text-gold/90">PATCH</code> la campaña (
+            <code className="text-white/70">winEvery</code>, <code className="text-white/70">active</code>) o un
+            premio por símbolo. <code className="text-white/70">stockRemaining</code> en PATCH es{" "}
+            <strong>valor absoluto</strong> restante, no un sumando. Detalle en{" "}
+            <code className="text-white/60">docs/aws-despliegue.md</code>.
+          </p>
+          <pre className="mt-2 overflow-x-auto rounded-xl bg-black/40 p-4 text-sm text-white/85">
+            {`# Ver estado
+curl http://localhost:3000/api/v1/campaigns/copa-2026 -H "X-Master-Key: TU_MASTER_ADMIN_KEY"
+
+# Cada 500 enlaces un ganador; pausar campaña
+curl -X PATCH http://localhost:3000/api/v1/campaigns/copa-2026 \\
+  -H "Content-Type: application/json" -H "X-Master-Key: TU_MASTER_ADMIN_KEY" \\
+  -d '{"winEvery":500,"active":false}'
+
+# Más peso al bono y 200 unidades restantes
+curl -X PATCH http://localhost:3000/api/v1/campaigns/copa-2026/prizes/BONO \\
+  -H "Content-Type: application/json" -H "X-Master-Key: TU_MASTER_ADMIN_KEY" \\
+  -d '{"weight":80,"stockRemaining":200}'`}
+          </pre>
         </div>
 
         <div>
@@ -123,9 +147,11 @@ npm run db:seed`}
       </section>
 
       <p className="mt-10 text-center text-sm text-white/45">
-        Producción: RDS u otro PostgreSQL administrado, HTTPS, rotación de API keys, rate limiting y cumplimiento
-        legal de juegos de suerte y azar en tu jurisdicción. Si el equipo crece, valorar{" "}
-        <code className="text-white/60">prisma migrate</code> para versionar cambios de esquema en lugar de solo{" "}
+        Producción: RDS, RDS Proxy, auto scaling en{" "}
+        <code className="text-white/70">docs/aws-despliegue.md</code>; cabeceras, rate limit básico y checklist en{" "}
+        <code className="text-white/70">docs/seguridad.md</code>. HTTPS, rotación de API keys, WAF y cumplimiento
+        legal en tu jurisdicción. Si el equipo crece, valorar{" "}
+        <code className="text-white/60">prisma migrate</code> para versionar esquema además de{" "}
         <code className="text-white/60">db push</code>.
       </p>
     </main>

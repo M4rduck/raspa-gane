@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { bearerApiKey, findCampaignByApiKey } from "@/lib/campaign-auth";
 import { assignPrizeForWinner } from "@/lib/prize-assignment";
 import { scratchLink } from "@/lib/app-url";
+import { withTransactionRetry } from "@/lib/transaction-retry";
+import { LIMITS, readJsonBodyLimited, stripControlChars } from "@/lib/security-input";
 
 export async function POST(request: Request) {
   try {
@@ -13,60 +15,79 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "API key inválida" }, { status: 401 });
     }
 
-    let body: { externalRef?: string };
-    try {
-      body = await request.json().catch(() => ({}));
-    } catch {
-      body = {};
+    const parsed = await readJsonBodyLimited<{ externalRef?: string }>(
+      request,
+      LIMITS.jsonBodyLinks,
+    );
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.message }, { status: parsed.status });
     }
+    const body = parsed.data;
     const externalRef =
       typeof body.externalRef === "string" && body.externalRef.trim().length > 0
-        ? body.externalRef.trim().slice(0, 200)
+        ? stripControlChars(body.externalRef).slice(0, LIMITS.externalRef)
         : null;
 
     const publicToken = nanoid(18);
 
-    const result = await prisma.$transaction(async (tx) => {
-      const updated = await tx.campaign.update({
-        where: { id: campaign.id },
-        data: { issuedCount: { increment: 1 } },
-        select: { issuedCount: true, winEvery: true },
-      });
-      const sequence = updated.issuedCount;
-      let isWinner = sequence % updated.winEvery === 0;
+    const result = await withTransactionRetry(() =>
+      prisma.$transaction(
+        async (tx) => {
+          const updated = await tx.campaign.update({
+            where: { id: campaign.id },
+            data: { issuedCount: { increment: 1 } },
+            select: { issuedCount: true, winEvery: true },
+          });
+          const sequence = updated.issuedCount;
+          let isWinner = sequence % updated.winEvery === 0;
 
-      let prizeId: string | null = null;
-      let prizeLabel: string | null = null;
-      let assignedSymbol: string | null = null;
+          let prizeId: string | null = null;
+          let prizeLabel: string | null = null;
+          let assignedSymbol: string | null = null;
 
-      if (isWinner) {
-        const configuredPrizes = await tx.prize.count({ where: { campaignId: campaign.id } });
-        if (configuredPrizes > 0) {
-          const assigned = await assignPrizeForWinner(tx, campaign.id);
-          if (!assigned) {
-            isWinner = false;
-          } else {
-            prizeId = assigned.prizeId;
-            prizeLabel = assigned.label;
-            assignedSymbol = assigned.symbol;
+          if (isWinner) {
+            const hasPrizeTable = await tx.prize.findFirst({
+              where: { campaignId: campaign.id },
+              select: { id: true },
+            });
+            if (hasPrizeTable) {
+              const assigned = await assignPrizeForWinner(tx, campaign.id);
+              if (!assigned) {
+                isWinner = false;
+                if (process.env.NODE_ENV === "production") {
+                  console.warn(
+                    JSON.stringify({
+                      event: "prize_stock_exhausted_demoted_to_loser",
+                      campaignId: campaign.id,
+                      sequence,
+                    }),
+                  );
+                }
+              } else {
+                prizeId = assigned.prizeId;
+                prizeLabel = assigned.label;
+                assignedSymbol = assigned.symbol;
+              }
+            }
           }
-        }
-      }
 
-      const token = await tx.scratchToken.create({
-        data: {
-          publicToken,
-          campaignId: campaign.id,
-          isWinner,
-          sequence,
-          externalRef,
-          prizeId,
-          prizeLabel,
-          assignedSymbol,
+          const token = await tx.scratchToken.create({
+            data: {
+              publicToken,
+              campaignId: campaign.id,
+              isWinner,
+              sequence,
+              externalRef,
+              prizeId,
+              prizeLabel,
+              assignedSymbol,
+            },
+          });
+          return { token, sequence };
         },
-      });
-      return { token, sequence };
-    });
+        { maxWait: 12_000, timeout: 25_000 },
+      ),
+    );
 
     const url = scratchLink(result.token.publicToken);
 

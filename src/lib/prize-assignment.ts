@@ -19,6 +19,9 @@ export type AssignedPrize = { prizeId: string; label: string; symbol: string };
 /**
  * Elige un premio por pesos relativos (ej. 1, 10, 50 ≈ 1%, 10%, 50% si son los únicos pesos).
  * Stock finito: decremento atómico; si hubo carrera, reintenta con la lista actual.
+ *
+ * Si no queda ningún premio con stock (o solo hay pesos 0), devuelve `null`: el llamador debe tratar el
+ * turno como **no ganador** (sin error HTTP): cupos agotados bajo concurrencia.
  */
 export async function assignPrizeForWinner(
   tx: Prisma.TransactionClient,
